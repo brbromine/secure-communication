@@ -36,9 +36,7 @@ async def websocket_handler(websocket, path):
                     broadcast_message = json.dumps({"user": user, "text": text})
                     
                     # Broadcast the message to all other connected clients
-                    # This ensures the sender also sees their message, but it comes from the server
-                    # for consistency.
-                    await broadcast(broadcast_message, sender_websocket=None) # Send to all
+                    await broadcast(broadcast_message)
                 else:
                     logging.warning(f"Received empty message text from {user} ({websocket.remote_address})")
 
@@ -55,13 +53,13 @@ async def websocket_handler(websocket, path):
         logging.error(f"Unexpected error in websocket_handler for {websocket.remote_address}: {e}")
     finally:
         # Unregister the client when they disconnect
-        CONNECTED_CLIENTS.remove(websocket)
-        logging.info(f"Client disconnected. Total clients: {len(CONNECTED_CLIENTS)}")
+        if websocket in CONNECTED_CLIENTS:
+            CONNECTED_CLIENTS.remove(websocket)
+            logging.info(f"Client disconnected. Total clients: {len(CONNECTED_CLIENTS)}")
 
-async def broadcast(message, sender_websocket=None):
+async def broadcast(message):
     """
     Sends a message to all connected clients.
-    Optionally excludes the sender if sender_websocket is provided.
     """
     if not CONNECTED_CLIENTS:
         logging.info("No clients to broadcast to.")
@@ -71,11 +69,10 @@ async def broadcast(message, sender_websocket=None):
     # Use a copy of the set to avoid "set changed size during iteration" if a client disconnects
     send_tasks = []
     for client in list(CONNECTED_CLIENTS):
-        # If sender_websocket is provided, skip sending back to the sender
-        # For chat, it's often better to send to all, so the sender's message
-        # is also processed through the server for consistency.
-        # if client != sender_websocket:
-        send_tasks.append(client.send(message))
+        try:
+            send_tasks.append(asyncio.create_task(client.send(message)))
+        except Exception as e:
+            logging.error(f"Error scheduling message to client: {e}")
 
     # Execute all send tasks concurrently
     if send_tasks:
@@ -87,7 +84,6 @@ async def broadcast(message, sender_websocket=None):
                 logging.error(f"Error sending message to a client: {task.exception()}")
     else:
         logging.info("No active clients to send message to.")
-
 
 async def main():
     """

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Hacker Chat Interface</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the hacker aesthetic */
+        body {
+            font-family: 'Inter', 'Courier New', monospace; /* Use Inter, fallback to monospace */
+            background-color: #1a1a1a; /* Dark background */
+            color: #00ff00; /* Bright green text */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Full viewport height */
+            margin: 0;
+            overflow: hidden; /* Prevent body scroll */
+        }
+        .chat-container {
+            width: 90%;
+            max-width: 800px;
+            height: 80vh; /* 80% of viewport height */
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #00ff00; /* Green border */
+            border-radius: 10px; /* Rounded corners */
+            overflow: hidden; /* Ensure content stays within borders */
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5); /* Green glow */
+        }
+        .chat-history {
+            flex-grow: 1;
+            padding: 1rem;
+            overflow-y: auto; /* Scrollable chat history */
+            background-color: #0d0d0d; /* Slightly darker background for history */
+            border-bottom: 1px solid #00ff00;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            /* Custom scrollbar for hacker look */
+            scrollbar-width: thin;
+            scrollbar-color: #00ff00 #0d0d0d;
+        }
+        .chat-history::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-history::-webkit-scrollbar-track {
+            background: #0d0d0d;
+        }
+        .chat-history::-webkit-scrollbar-thumb {
+            background-color: #00ff00;
+            border-radius: 10px;
+            border: 2px solid #0d0d0d;
+        }
+        .chat-input-area {
+            display: flex;
+            padding: 1rem;
+            background-color: #1a1a1a;
+        }
+        .chat-input {
+            flex-grow: 1;
+            background-color: #0d0d0d;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 0.75rem;
+            border-radius: 8px;
+            outline: none;
+            font-size: 0.9rem;
+            margin-right: 0.5rem;
+            transition: border-color 0.3s ease;
+        }
+        .chat-input:focus {
+            border-color: #33ff33; /* Lighter green on focus */
+            box-shadow: 0 0 5px rgba(51, 255, 51, 0.7);
+        }
+        .send-button {
+            background-color: #00ff00;
+            color: #1a1a1a;
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: bold;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+        .send-button:hover {
+            background-color: #33ff33;
+            transform: translateY(-2px);
+        }
+        .send-button:active {
+            transform: translateY(0);
+        }
+        .message {
+            margin-bottom: 0.5rem;
+        }
+        .system-message {
+            color: #ffcc00; /* Yellow for system messages */
+        }
+        .username-input {
+            background-color: #0d0d0d;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 0.75rem;
+            border-radius: 8px;
+            outline: none;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem; /* Added margin-bottom */
+            width: 100%; /* Full width */
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div id="chat-history" class="chat-history">
+            <!-- Chat messages will appear here -->
+            <div class="message system-message">Connecting to secure channel...</div>
+            <div class="message system-message">Establishing encrypted link...</div>
+        </div>
+        <div class="chat-input-area flex-col">
+            <input type="text" id="username-input" class="username-input" placeholder="> Enter your username (e.g., 'Hacker1')...">
+            <div class="flex w-full">
+                <input type="text" id="chat-input" class="chat-input" placeholder="> Type your message here..." disabled>
+                <button id="send-button" class="send-button" disabled>SEND</button>
+            </div>
+        </div>
+    </div>
+ 
+    <script>
+        const chatHistory = document.getElementById('chat-history');
+        const usernameInput = document.getElementById('username-input');
+        const chatInput = document.getElementById('chat-input');
+        const sendButton = document.getElementById('send-button');
+ 
+        let ws; // WebSocket connection object
+        let username = ''; // Store the user's chosen username
+ 
+        // Function to add a message to the chat history
+        function addMessage(message, isSystem = false) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            if (isSystem) {
+                messageElement.classList.add('system-message');
+            }
+            messageElement.textContent = message;
+            chatHistory.appendChild(messageElement);
+            // Scroll to the bottom to show the latest message
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+ 
+        // Function to establish WebSocket connection
+        function connectWebSocket() {
+            // IMPORTANT: Replace <YOUR_SERVER_TAILSCALE_IP> with the actual Tailscale IP
+            // of the computer running the Python chat_server.py script.
+            // Also ensure the port (8765) matches the server's listening port.
+            const serverIp = "100.122.44.98"; // <<< --- REPLACE THIS --- >>>
+            const wsPort = 8765; // Must match the port in chat_server.py
+ 
+ 
+            addMessage(`System: Attempting to connect to WebSocket server at ws://${serverIp}:${wsPort}...`, true);
+            ws = new WebSocket(`ws://${serverIp}:${wsPort}`);
+ 
+            ws.onopen = function() {
+                addMessage('System: Connection established. You can now chat.', true);
+                chatInput.disabled = false;
+                sendButton.disabled = false;
+                chatInput.focus();
+            };
+ 
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.user && data.text) {
+                        addMessage(`${data.user}: ${data.text}`);
+                    }
+                } catch (e) {
+                    addMessage(`System: Received raw: ${event.data}`, true); // Fallback for non-JSON messages
+                    console.error("Error parsing message:", e, event.data);
+                }
+            };
+ 
+            ws.onclose = function(event) {
+                addMessage(`System: Disconnected from server. Code: ${event.code}, Reason: ${event.reason}`, true);
+                chatInput.disabled = true;
+                sendButton.disabled = true;
+                chatInput.placeholder = "Disconnected.";
+            };
+ 
+            ws.onerror = function(error) {
+                addMessage('System: WebSocket Error. Check console for details.', true);
+                console.error('WebSocket Error:', error);
+            };
+        }
+ 
+        // Function to handle sending messages
+        function sendMessage() {
+            const messageText = chatInput.value.trim();
+            if (messageText !== '' && ws && ws.readyState === WebSocket.OPEN) {
+                const messageData = {
+                    user: username,
+                    text: messageText
+                };
+                ws.send(JSON.stringify(messageData));
+                chatInput.value = ''; // Clear the input field
+                chatInput.focus();
+            }
+        }
+ 
+        // Event listener for username input
+        usernameInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                const enteredUsername = usernameInput.value.trim();
+                if (enteredUsername) {
+                    username = enteredUsername;
+                    usernameInput.disabled = true;
+                    addMessage(`System: Username set to '${username}'.`, true);
+                    connectWebSocket(); // Connect once username is set
+                } else {
+                    addMessage('System: Please enter a username.', true);
+                }
+            }
+        });
+ 
+        // Event listener for the send button
+        sendButton.addEventListener('click', sendMessage);
+ 
+        // Event listener for pressing Enter in the chat input field
+        chatInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+ 
+        // Focus on the username input when the page loads
+        window.onload = function() {
+            usernameInput.focus();
+        };
+    </script>
+</body>
+</html>
+ 
+ 

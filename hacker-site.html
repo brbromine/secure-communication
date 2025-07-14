@@ -158,14 +158,15 @@
                 sendButton.disabled = true;
                 return;
             }
-            const serverIp = "100.122.44.98"; // Change to your server IP
-            const wsPort = 8765;
-            addMessage(`System: Attempting to connect to ws://${serverIp}:${wsPort}...`, true);
+            // const serverIp = "100.122.44.98"; // Change to your server IP
+            // const wsPort = 8765;
+            // addMessage(`System: Attempting to connect to ws://${serverIp}:${wsPort}...`, true);
+            addMessage(`System: Attempting to connect to wss://laptop-vbd9i8qo.tail208fed.ts.net/...`, true);
 
             try {
-                ws = new WebSocket(`ws://${serverIp}:${wsPort}`);
+                ws = new WebSocket("wss://laptop-vbd9i8qo.tail208fed.ts.net/");
             } catch (err) {
-                addMessage("System: Failed to create WebSocket. Check server IP/port.", true);
+                addMessage("System: Failed to create WebSocket. Check Funnel URL.", true);
                 return;
             }
 

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Hacker Chat Interface</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom styles for the hacker aesthetic */
@@ -126,118 +125,130 @@
             </div>
         </div>
     </div>
- 
     <script>
         const chatHistory = document.getElementById('chat-history');
         const usernameInput = document.getElementById('username-input');
         const chatInput = document.getElementById('chat-input');
         const sendButton = document.getElementById('send-button');
- 
-        let ws; // WebSocket connection object
-        let username = ''; // Store the user's chosen username
- 
-        // Function to add a message to the chat history
+
+        let ws = null;
+        let username = '';
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT = 3;
+
+        function sanitize(str) {
+            return str.replace(/[<>&"]/g, function(c) {
+                return {'<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;'}[c];
+            });
+        }
+
         function addMessage(message, isSystem = false) {
             const messageElement = document.createElement('div');
             messageElement.classList.add('message');
-            if (isSystem) {
-                messageElement.classList.add('system-message');
-            }
+            if (isSystem) messageElement.classList.add('system-message');
             messageElement.textContent = message;
             chatHistory.appendChild(messageElement);
-            // Scroll to the bottom to show the latest message
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }
- 
-        // Function to establish WebSocket connection
+
         function connectWebSocket() {
-            // IMPORTANT: Replace <YOUR_SERVER_TAILSCALE_IP> with the actual Tailscale IP
-            // of the computer running the Python chat_server.py script.
-            // Also ensure the port (8765) matches the server's listening port.
-            const serverIp = "100.122.44.98"; // <<< --- REPLACE THIS --- >>>
-            const wsPort = 8765; // Must match the port in chat_server.py
- 
- 
-            addMessage(`System: Attempting to connect to WebSocket server at ws://${serverIp}:${wsPort}...`, true);
-            ws = new WebSocket(`ws://${serverIp}:${wsPort}`);
- 
+            if (!("WebSocket" in window)) {
+                addMessage("System: Your browser does not support WebSockets.", true);
+                chatInput.disabled = true;
+                sendButton.disabled = true;
+                return;
+            }
+            const serverIp = "100.122.44.98"; // Change to your server IP
+            const wsPort = 8765;
+            addMessage(`System: Attempting to connect to ws://${serverIp}:${wsPort}...`, true);
+
+            try {
+                ws = new WebSocket(`ws://${serverIp}:${wsPort}`);
+            } catch (err) {
+                addMessage("System: Failed to create WebSocket. Check server IP/port.", true);
+                return;
+            }
+
             ws.onopen = function() {
                 addMessage('System: Connection established. You can now chat.', true);
                 chatInput.disabled = false;
                 sendButton.disabled = false;
-                chatInput.focus();
+                chatInput.placeholder = "> Type your message here...";
+                reconnectAttempts = 0;
             };
- 
+
             ws.onmessage = function(event) {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.user && data.text) {
-                        addMessage(`${data.user}: ${data.text}`);
+                        addMessage(`${sanitize(data.user)}: ${sanitize(data.text)}`);
                     }
                 } catch (e) {
-                    addMessage(`System: Received raw: ${event.data}`, true); // Fallback for non-JSON messages
+                    addMessage(`System: Received raw: ${event.data}`, true);
                     console.error("Error parsing message:", e, event.data);
                 }
             };
- 
+
             ws.onclose = function(event) {
                 addMessage(`System: Disconnected from server. Code: ${event.code}, Reason: ${event.reason}`, true);
                 chatInput.disabled = true;
                 sendButton.disabled = true;
                 chatInput.placeholder = "Disconnected.";
+                if (reconnectAttempts < MAX_RECONNECT) {
+                    reconnectAttempts++;
+                    addMessage(`System: Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT})...`, true);
+                    setTimeout(connectWebSocket, 2000 * reconnectAttempts);
+                } else {
+                    addMessage("System: Could not reconnect. Please refresh the page.", true);
+                    usernameInput.disabled = false;
+                }
             };
- 
+
             ws.onerror = function(error) {
                 addMessage('System: WebSocket Error. Check console for details.', true);
                 console.error('WebSocket Error:', error);
             };
         }
- 
-        // Function to handle sending messages
+
         function sendMessage() {
             const messageText = chatInput.value.trim();
-            if (messageText !== '' && ws && ws.readyState === WebSocket.OPEN) {
-                const messageData = {
-                    user: username,
-                    text: messageText
-                };
-                ws.send(JSON.stringify(messageData));
-                chatInput.value = ''; // Clear the input field
-                chatInput.focus();
+            if (!messageText) return;
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addMessage("System: Not connected to server.", true);
+                return;
             }
+            ws.send(JSON.stringify({
+                user: username,
+                text: messageText
+            }));
+            chatInput.value = '';
+            chatInput.focus();
         }
- 
-        // Event listener for username input
+
         usernameInput.addEventListener('keypress', function(event) {
             if (event.key === 'Enter') {
                 const enteredUsername = usernameInput.value.trim();
                 if (enteredUsername) {
-                    username = enteredUsername;
+                    username = sanitize(enteredUsername);
                     usernameInput.disabled = true;
                     addMessage(`System: Username set to '${username}'.`, true);
-                    connectWebSocket(); // Connect once username is set
+                    connectWebSocket();
                 } else {
                     addMessage('System: Please enter a username.', true);
                 }
             }
         });
- 
-        // Event listener for the send button
+
         sendButton.addEventListener('click', sendMessage);
- 
-        // Event listener for pressing Enter in the chat input field
         chatInput.addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
+            if (event.key === 'Enter') sendMessage();
         });
- 
-        // Focus on the username input when the page loads
+
         window.onload = function() {
             usernameInput.focus();
         };
     </script>
 </body>
 </html>
- 
- 
+
+
